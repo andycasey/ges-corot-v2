@@ -102,5 +102,18 @@ for i in range(len(masterlist[1].data)):
 
 database.connection.commit()
 
+# Remove superfluous fake nodes.
+contributing_node_ids = database.retrieve_table(
+    """ SELECT DISTINCT ON (node_id) node_id
+        FROM results
+        WHERE teff <> 'NaN'
+    """)["node_id"]
+
+all_node_ids = database.retrieve_table("SELECT id FROM nodes")["id"]
+for node_id in set(all_node_ids).difference(contributing_node_ids):
+    database.execute("DELETE FROM nodes WHERE id = %s", (node_id, ))
+
+database.connection.commit()
+
 logger.info("Ingestion complete.")
 

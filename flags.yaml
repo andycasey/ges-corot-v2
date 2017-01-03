@@ -1,0 +1,42 @@
+# All flags taken from WG14 dictionary for GES iDR5:
+# https://docs.google.com/spreadsheets/d/1rpgi2MC41iu8nkvfZfK0KMWp_GH1xI4RvK3SSLRL43g/edit#gid=1224142251
+
+
+# Anything matching the propagate_flags_by_spectrum (when used as a PostgreSQL 
+# `LIKE` query, e.g.: "TECH LIKE '%{spectrum_related_flag}-%'") will be 
+# propagated to other results that use (any part of) the same spectrum. For 
+# example, specifying '10100' will search for TECH entries matching '%10100-%' 
+# (the dash - is included for you)
+#propagate_flags_by_spectrum:
+#  no_constraint:
+#    - 10100 # Saturated spectrum
+
+
+# Anything matching these flags will cause us to mark that particular node 
+# result as being suspicious, and won't get used in homogenisation.
+node_specific_flags:
+  no_constraint:
+    - 10302 # Code convergence issue: one of more convergence criteria (node-specific) could not be fulfilled. Criteria to be described using the suffix
+    - 10311 # No parameters because too few Fe I lines
+    - 10300 # Key setup(s) for a given paramater determination is missing
+    - 13020 # Suspicious stellar parameters because temperature (Teff) is on the node's grid edge. Conditions to be described using the suffix
+    - 10302 # Code convergence issue: one of more convergence criteria (node-specific) could not be fulfilled. Criteria to be described using the suffix
+    - 13022 # Suspicious stellar parameters because metallicity ([M/H] or [Fe/H]) is on the node's grid edge. Conditions to be described using the suffix
+    - ABA # Porto group: We have result, our errors are NOT acceptable, logg >2.5 
+    - BBA # Porto group: We have NO result, our errors are NOT acceptable, logg >2.5
+    - BBB # Porto group: We have NO result, our errors are NOT acceptable, logg =<2.5
+    - ABB # Porto group: no description.
+    - 10308 # One or more parameter (which could not be identified) outside the node's grid; if possible rather use 10303-10307 flags
+    - 13000 # Microturbulence (vtur): unphysical or unreliable determination
+    - 10302 # Code convergence issue: one of more convergence criteria (node-specific) could not be fulfilled. Criteria to be described using the suffix
+  1: # IAC: Bad results.
+    constraint: "node_id = 4"
+
+# Anything matching these flags will cause us to mark all results from that
+# CNAME as being suspicious, and won't get used in homogenisation.
+# NOTE: If you have time, you should actually look to see what effect this has
+#       on the individual nodes, because some will be able to handle these
+#       conditions while others will not, so you may be throwing away data!
+#propagate_flags_by_cname:
+#  no_constraint:
+# - 11100 # v*sin(i) too high, preventing the determination of some/all parameters: v*sin(i) > 100 km/s
