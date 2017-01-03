@@ -153,11 +153,7 @@ def _homogenise_survey_measurements(database, wg, parameter, cname, N=100,
 
             spectrum_snr = np.clip(estimates["snr"][s:e], 1, 500)
             
-            
-            #var_node_sys[j] = samples["vs_c"][i, j] * np.exp(np.sum([
-            #    samples["vs_a"][i, l, k] * pow(1 - xs[l], samples["vs_b"][i, l, k]) \
-            #        for l in range(len(xs))]))
-            var_node_sys[j] = samples["vs_c"][i, k] * (4.0 
+            var_node_sys[j] = (samples["sigma_sys_constant"][i, k] * (4.0 
                 + samples["vs_ta{}".format(k + 1)][i] * xs[0]**2
                 + samples["vs_la{}".format(k + 1)][i] * xs[1]**2
                 + samples["vs_fa{}".format(k + 1)][i] * xs[2]**2
@@ -167,7 +163,7 @@ def _homogenise_survey_measurements(database, wg, parameter, cname, N=100,
                 + samples["vs_tc7"][i, k] * xs[0] * xs[1]
                 + samples["vs_tc8"][i, k] * xs[0] * xs[2]
                 + samples["vs_tc9"][i, k] * xs[1] * xs[2]
-            )
+            ))**2
 
 
             diag_variance = (samples["alpha_sq"][i, k]/spectrum_snr) \
@@ -417,6 +413,9 @@ class BaseEnsembleModel(object):
         self._calibrators = calibrators
 
         model_code = kwargs.get("model_code", None)
+        if kwargs.get("model_path", None) is not None:
+            self._MODEL_PATH = kwargs["model_path"]
+            
         if model_code is None:
             with open(self._MODEL_PATH, "r") as fp:
                 model_code = fp.read()
@@ -811,7 +810,7 @@ class EnsembleModel(BaseEnsembleModel):
 
     _MODEL_PATH = os.path.join(
         os.path.dirname(os.path.realpath(__file__)),
-        "ensemble-model-wg10-4.stan")
+        "ensemble-model.stan")
 
     def _prepare_data(self, parameter=None, default_sigma_calibrator=1e3,
         minimum_node_estimates=1, sql_constraint=None):

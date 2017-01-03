@@ -2,7 +2,7 @@
 // Single-parameter ensemble model with correlation coefficients between nodes
 // Note that this model assumes a negligible random uncertainty contribution
 
-// THIS IS HARD CODED TO EXPECT 6 NODES
+// THIS IS HARD CODED TO EXPECT 4 NODES
 
 data {
     int<lower=1> N; // number of nodes (estimators)
@@ -88,45 +88,36 @@ parameters {
     real vs_tb2;
     real vs_tb3;
     real vs_tb4;
-    real vs_tb5;
-    real vs_tb6;
 
     real vs_lb1;
     real vs_lb2;
     real vs_lb3;
     real vs_lb4;
-    real vs_lb5;
-    real vs_lb6;
+
 
     real vs_fb1;
     real vs_fb2;
     real vs_fb3;
     real vs_fb4;
-    real vs_fb5;
-    real vs_fb6;
+
 
     real<lower=pow(vs_tb1/2.0, 2)> vs_ta1;
     real<lower=pow(vs_tb2/2.0, 2)> vs_ta2;
     real<lower=pow(vs_tb3/2.0, 2)> vs_ta3;
     real<lower=pow(vs_tb4/2.0, 2)> vs_ta4;
-    real<lower=pow(vs_tb5/2.0, 2)> vs_ta5;
-    real<lower=pow(vs_tb6/2.0, 2)> vs_ta6;
+
 
 
     real<lower=pow(vs_lb1/2.0, 2)> vs_la1;
     real<lower=pow(vs_lb2/2.0, 2)> vs_la2;
     real<lower=pow(vs_lb3/2.0, 2)> vs_la3;
     real<lower=pow(vs_lb4/2.0, 2)> vs_la4;
-    real<lower=pow(vs_lb5/2.0, 2)> vs_la5;
-    real<lower=pow(vs_lb6/2.0, 2)> vs_la6;
 
 
     real<lower=pow(vs_fb1/2.0, 2)> vs_fa1;
     real<lower=pow(vs_fb2/2.0, 2)> vs_fa2;
     real<lower=pow(vs_fb3/2.0, 2)> vs_fa3;
     real<lower=pow(vs_fb4/2.0, 2)> vs_fa4;
-    real<lower=pow(vs_fb5/2.0, 2)> vs_fa5;
-    real<lower=pow(vs_fb6/2.0, 2)> vs_fa6;
 
     real<lower=0> vs_tc7[N]; // Cross term coefficients for teff * logg 
     real<lower=0> vs_tc8[N]; // Cross term coefficients for teff * feh
@@ -198,29 +189,6 @@ transformed parameters {
                                   + vs_tc8[4] * AMCS[8, c]
                                   + vs_tc9[4] * AMCS[9, c];
 
-            relative_sigma_sys[5] = vs_ta5 * AMCS[1, c]
-                                  + vs_la5 * AMCS[2, c]
-                                  + vs_fa5 * AMCS[3, c]
-
-                                  + vs_tb5 * AMCS[4, c]
-                                  + vs_lb5 * AMCS[5, c]
-                                  + vs_fb5 * AMCS[6, c]
-
-                                  + vs_tc7[5] * AMCS[7, c]
-                                  + vs_tc8[5] * AMCS[8, c]
-                                  + vs_tc9[5] * AMCS[9, c];
-
-            relative_sigma_sys[6] = vs_ta6 * AMCS[1, c]
-                                  + vs_la6 * AMCS[2, c]
-                                  + vs_fa6 * AMCS[3, c]
-
-                                  + vs_tb6 * AMCS[4, c]
-                                  + vs_lb6 * AMCS[5, c]
-                                  + vs_fb6 * AMCS[6, c]
-
-                                  + vs_tc7[6] * AMCS[7, c]
-                                  + vs_tc8[6] * AMCS[8, c]
-                                  + vs_tc9[6] * AMCS[9, c];
 
             // For each visit of the calibrator
             for (v in 1:visits[c]) {
