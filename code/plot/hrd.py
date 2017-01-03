@@ -64,6 +64,7 @@ def hrd_by_setup(database, wg, node_name):
 
     mh_col = utils.mh_or_feh(results)
 
+    mappable = []
     fig = plt.figure(figsize=(6 * N_setups, 6))
     for i, setup in enumerate(setups):
 
@@ -71,10 +72,15 @@ def hrd_by_setup(database, wg, node_name):
 
         ax = fig.add_subplot(gs[i])
 
-        scat = ax.scatter(results["teff"][mask], results["logg"][mask],
-            facecolor=results[mh_col][mask], edgecolor="k", s=100,
-            vmin=np.nanmin(results[mh_col]), vmax=np.nanmax(results[mh_col]),
-            cmap="plasma")
+        kwds = dict(edgecolor="k", s=100)
+        vmin, vmax = np.nanmin(results[mh_col]), np.nanmax(results[mh_col])
+        if vmin != vmax:
+            kwds.update(facecolor=results[mh_col][mask], vmin=vmin, vmax=vmax,
+                cmap="plasma")
+
+        scat = ax.scatter(results["teff"][mask], results["logg"][mask], **kwds)
+        if vmin != vmax:
+            mappable.append(scat)
         ax.errorbar(results["teff"][mask], results["logg"][mask],
             xerr=results["e_teff"][mask], yerr=results["e_logg"][mask],
             fmt=None, ecolor="#666666", alpha=0.5, zorder=-1)
@@ -90,8 +96,9 @@ def hrd_by_setup(database, wg, node_name):
         ax.set_ylim(ax.get_ylim()[::-1])
 
     cax = fig.add_subplot(gs[-1])
-    cb = fig.colorbar(cax=cax, mappable=scat)
-    cb.set_label(r"$[{\rm Fe}/{\rm H}]$")
+    if mappable:
+        cb = fig.colorbar(cax=cax, mappable=mappable[0])
+        cb.set_label(r"$[{\rm Fe}/{\rm H}]$")
 
     #fig.tight_layout()
 

@@ -249,12 +249,15 @@ class GESDatabase(Database):
 
         # Which node is this?
         wg, node_name = utils.parse_node_filename(filename)
-        node_id = self.retrieve_node_id(wg, node_name)
+        #node_id = self.retrieve_node_id(wg, node_name)
+        uves_node_id = self.retrieve_node_id(wg, "UVES-{}".format(node_name))
+        giraffe_node_id = self.retrieve_node_id(wg, "GIRAFFE-{}".format(node_name))
 
         # Start ingesting results.
         data = Table.read(filename, hdu=extension)
 
-        default_row = {"node_id": node_id}
+        #default_row = {"node_id": node_id}
+        default_row = {"node_id": -1}
         columns = (
             "node_id", "cname", "filename", "setup", "snr",
             "vel", "e_vel", "vrot", "e_vrot",     
@@ -306,6 +309,13 @@ class GESDatabase(Database):
             row_data = {}
             row_data.update(default_row)
             row_data.update(dict(zip(columns[1:], [row[c.upper()] for c in columns[1:]])))
+
+            if row_data["setup"].strip() == "UVES":
+                row_data["node_id"] = uves_node_id
+            elif row_data["setup"].strip() == "GIRAFFE":
+                row_data["node_id"] = giraffe_node_id
+            else:
+                raise WTFError
 
             if node_name == "Carmela-Elena":
                 use_columns = [] + list(columns)

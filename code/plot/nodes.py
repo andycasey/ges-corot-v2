@@ -188,7 +188,7 @@ def compare_nodes_within_wg(database, wg, parameter, extent=None,
 
     wg = utils.wg_as_int(wg)
     parameter = parameter.lower()
-    if parameter not in ("teff", "logg", "mh", "xi"):
+    if parameter not in ("teff", "logg", "feh", "xi"):
         raise ValueError("parameter '{}' not recognised".format(parameter))
 
     # Get the nodes.
@@ -198,11 +198,11 @@ def compare_nodes_within_wg(database, wg, parameter, extent=None,
 
     # Get the data.
     results = database.retrieve_table(
-        """SELECT r.node_id, r.cname, r.filename, r.{0}, r.e_{0}, r.feh, r.e_feh
-        FROM results r, nodes n 
-        WHERE n.wg = %s and n.id = r.node_id
-        """.format(parameter),
-        (wg, ))
+        """ SELECT  r.node_id, r.cname, r.filename, r.teff, r.e_teff, r.logg, 
+                    r.e_logg, r.feh, r.e_feh, r.xi, r.e_xi
+            FROM    results r, nodes n 
+            WHERE   n.wg = %s and n.id = r.node_id
+        """, (wg, ))
 
     results = results.group_by("cname")
     N_groups = len(results.groups)
@@ -218,15 +218,8 @@ def compare_nodes_within_wg(database, wg, parameter, extent=None,
         for index in range(start_index, end_index):
             j = np.where(results["node_id"][index] == node_ids)[0][0]
 
-            if parameter == "mh" and \
-            not np.any(np.isfinite(results["mh"][index])) \
-            and np.any(results["feh"][index]):
-                data[j, i] = results["feh"][index]
-                error[j, i] = results["e_feh"][index]
-
-            else:
-                data[j, i] = results[parameter][index]
-                error[j, i] = results["e_{}".format(parameter)][index]
+            data[j, i] = results[parameter][index]
+            error[j, i] = results["e_{}".format(parameter)][index]
 
     # Remove axes without any data.
     use = np.any(np.isfinite(data), axis=1)
@@ -297,8 +290,12 @@ def compare_nodes_within_wg(database, wg, parameter, extent=None,
                 ax.yaxis.set_major_locator(MaxNLocator(5))
 
             else:
-                lim[0] = np.nanmin([ax.get_xlim()[0], ax.get_ylim()[0], lim[0]])
-                lim[1] = np.nanmax([ax.get_xlim()[1], ax.get_ylim()[1], lim[1]])
+                finite = np.isfinite(data[j, :] * data[i, :])
+                values = np.vstack([data[j, finite], data[i, finite]]).flatten()
+                if values.size > 0:
+                    ax_lim = (np.min(values), np.max(values))
+                    lim[0] = np.nanmin([lim[0], ax_lim[0]])
+                    lim[1] = np.nanmax([lim[1], ax_lim[1]])
 
     # Ensure all have the same limits and ticks.
     if extent is None:

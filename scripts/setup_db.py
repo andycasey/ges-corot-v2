@@ -89,6 +89,17 @@ database.execute(
            SET cname = '22563384+1633085'
          WHERE ges_fld like 'GJ880%'""")
 
+# Some of the nodes did not keep the logg values from the masterlist file.
+masterlist = fits.open(masterlist_filename)
+for i in range(len(masterlist[1].data)):
+    cname = masterlist[1].data["CNAME"][i]
+    logg = masterlist[1].data["LOGG"][i]
+    e_logg = masterlist[1].data["E_LOGG"][i]
+    database.execute(
+        """ UPDATE results 
+            SET logg = %s, e_logg = %s 
+            WHERE cname = %s """, (float(logg), float(e_logg), cname))
+
 database.connection.commit()
 
 logger.info("Ingestion complete.")

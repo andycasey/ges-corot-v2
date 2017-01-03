@@ -1,9 +1,17 @@
 WG1:
-  - Carmela-Elena
-  - Damiani
-  - Epinarbo
-  - IACAIP
-  - Lumba
-  - Photometry
-  - Porto
-  - Vilnius
+  - UVES-Carmela-Elena
+  - UVES-Damiani
+  - UVES-Epinarbo
+  - UVES-IACAIP
+  - UVES-Lumba
+  - UVES-Photometry
+  - UVES-Porto
+  - UVES-Vilnius
+  - GIRAFFE-Carmela-Elena
+  - GIRAFFE-Damiani
+  - GIRAFFE-Epinarbo
+  - GIRAFFE-IACAIP
+  - GIRAFFE-Lumba
+  - GIRAFFE-Photometry
+  - GIRAFFE-Porto
+  - GIRAFFE-Vilnius

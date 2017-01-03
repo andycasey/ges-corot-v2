@@ -136,7 +136,8 @@ def tech_flags(database, wg, node_name, column="TECH"):
     if flags is None: return None
 
     counts = Counter([each.strip() \
-        for each in "|".join(flags["tech"]).split("|") if each.strip()])
+        for each in "|".join([flag or "" for flag in flags["tech"]]).split("|") if each.strip()])
     rows = sorted(counts.iteritems(), key=lambda (k, v): v)[::-1]
-    
+    if not rows:
+        rows = [("None", len(flags))]
     return Table(rows=rows, names=("{} FLAG".format(column.upper()), "N"))
