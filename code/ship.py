@@ -13,10 +13,10 @@ from db import Database
 logger = logging.getLogger("ges")
 
 
-def wg_recommended_sp_template(database, input_path, output_path, wg,
-    ext=-1, overwrite=False, **kwargs):
+def homogenised_catalog(database, input_path, output_path, wg, ext=-1, 
+    overwrite=False, **kwargs):
     """
-    Produce a WG-recommended file of stellar parameters from the template 
+    Produce a recommended file of stellar parameters from the template 
     provided (on a per CNAME) basis.
 
     :param database:
@@ -192,71 +192,69 @@ def wg_recommended_sp_template(database, input_path, output_path, wg,
         for propagated_column in propagate_to_columns:
             image[ext].data[propagated_column] = image[ext].data[column]
 
-    # If this is WG 11, then we will do the TECH flags.
-    if wg == 11:
-        logger.info("Doing TECH flags separately")
-        max_length = -1
-        concatenated_tech = []
-        for i, cname in enumerate(image[ext].data["CNAME"]):
+    # Do the TECH flags.
 
-            logger.info("At row {}/{}: {}".format(i + 1, N, cname))
+    logger.info("Doing TECH flags separately")
+    max_length = -1
+    concatenated_tech = []
+    for i, cname in enumerate(image[ext].data["CNAME"]):
 
-            if np.isfinite(updated_data["teff"][i]):
-                record = database.retrieve_table(
-                    """ SELECT w.id, string_agg(DISTINCT r.tech, '|') AS tech
-                        FROM wg_recommended_results AS w,
-                             results as r
-                        WHERE w.wg = %s
-                          AND r.id = ANY(
-                                  w.provenance_ids_for_teff ||
-                                  w.provenance_ids_for_logg ||
-                                  w.provenance_ids_for_feh)
-                          AND r.tech <> 'NaN'
-                          AND r.tech <> ''
-                          AND w.cname = %s
-                        GROUP BY w.id;
-                    """, (wg, cname))
+        logger.info("At row {}/{}: {}".format(i + 1, N, cname))
 
-            else:
-                record = database.retrieve_table(
-                    """ SELECT string_agg(DISTINCT r.tech, '|') AS tech
-                        FROM results as r,
-                             nodes as n
-                        WHERE r.node_id = n.id
-                          AND n.wg = %s
-                          AND r.cname = %s
-                          AND r.tech <> 'NaN'
-                          AND r.tech <> '';
-                    """, (wg, cname))
-
-            if record is None:
-                concatenated_tech.append("")
-
-            else:
-                tech = "|".join(sorted(map(str.strip, list(set(record["tech"][0].split("|"))))))
-                concatenated_tech.append(tech)
-
-                max_length = max([max_length, len(tech)])
-
-            print("TECH", i, cname, concatenated_tech[-1])
-
-        # Fuck this shit.
-        if not "FixedLength" in input_path:
-            cols = fits.ColDefs(
-                [col for col in image[ext].columns[:-1]] \
-                    + [fits.Column(name="TECH", format="A{}".format(max_length),
-                                   array=concatenated_tech)])
-            image[ext] = fits.BinTableHDU.from_columns(cols)
+        if np.isfinite(updated_data["teff"][i]):
+            record = database.retrieve_table(
+                """ SELECT w.id, string_agg(DISTINCT r.tech, '|') AS tech
+                    FROM wg_recommended_results AS w,
+                         results as r
+                    WHERE w.wg = %s
+                      AND r.id = ANY(
+                              w.provenance_ids_for_teff ||
+                              w.provenance_ids_for_logg ||
+                              w.provenance_ids_for_feh)
+                      AND r.tech <> 'NaN'
+                      AND r.tech <> ''
+                      AND w.cname = %s
+                    GROUP BY w.id;
+                """, (wg, cname))
 
         else:
-            if max_length > 250:
-                logger.warn("Some TECH flags are going to be truncated!")
-            image[ext].data["TECH"] = concatenated_tech
+            record = database.retrieve_table(
+                """ SELECT string_agg(DISTINCT r.tech, '|') AS tech
+                    FROM results as r,
+                         nodes as n
+                    WHERE r.node_id = n.id
+                      AND n.wg = %s
+                      AND r.cname = %s
+                      AND r.tech <> 'NaN'
+                      AND r.tech <> '';
+                """, (wg, cname))
 
+        if record is None:
+            concatenated_tech.append("")
+
+        else:
+            tech = "|".join(sorted(map(str.strip, list(set(record["tech"][0].split("|"))))))
+            concatenated_tech.append(tech)
+
+            max_length = max([max_length, len(tech)])
+
+        print("TECH", i, cname, concatenated_tech[-1])
+
+    # Is it a fixed length template?
+    if not "FixedLength" in input_path:
+        cols = fits.ColDefs(
+            [col for col in image[ext].columns[:-1]] \
+                + [fits.Column(name="TECH", format="A{}".format(max_length),
+                               array=concatenated_tech)])
+        image[ext] = fits.BinTableHDU.from_columns(cols)
+
+    else:
+        if max_length > 250:
+            logger.warn("Some TECH flags are going to be truncated!")
+        image[ext].data["TECH"] = concatenated_tech
 
     # Update the release date.
     now = datetime.now()
-    image[1].header["EXTNAME"] = "WGParametersWGAbundances"
     image[0].header["DATETAB"] = "{year}-{month}-{day}".format(
         year=now.year, month=now.month, day=now.day)
 
@@ -265,11 +263,11 @@ def wg_recommended_sp_template(database, input_path, output_path, wg,
     hdu.header.update({
         "RELEASE": image[0].header["RELEASE"],
         "DATETAB": image[0].header["DATETAB"],
-        "INSTRUME": image[0].header["INSTRUME"],
-        "NODE1": "WG{}".format(wg),
-        "EXTNAME": "WGParametersWGAbundancesAdd",
-        "EXTDUMMY": True,
-        "COMMENT": "GES WG Recommended Parameters and Abundances"
+        #"INSTRUME": image[0].header["INSTRUME"],
+        ##"NODE1": "WG{}".format(wg),
+        #"EXTNAME": "WGParametersWGAbundancesAdd",
+        #"EXTDUMMY": True,
+        #"COMMENT": "GES WG Recommended Parameters and Abundances"
     })
     if "SIMPLE" in hdu.header:
         del hdu.header["SIMPLE"]

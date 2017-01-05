@@ -313,4 +313,27 @@ for node_id in superfluous_node_ids:
 
 logger.info("Removed {} superfluous nodes".format(len(superfluous_node_ids)))
 
+
+# The Photometry node have 65 instances where the SETUP entry does not match the
+# FILENAME entry.
+uves_node_id = database.retrieve_node_id(1, "UVES-Photometry")
+giraffe_node_id = database.retrieve_node_id(1, "GIRAFFE-Photometry")
+database.execute(
+    """ UPDATE  results
+        SET     setup = 'GIRAFFE',
+                node_id = '{giraffe_node_id}'
+        WHERE   filename LIKE 'gir_%'
+          AND   setup LIKE 'UVES%'
+          AND   node_id = '{uves_node_id}';
+    """.format(giraffe_node_id=giraffe_node_id, uves_node_id=uves_node_id))
+
+database.execute(
+    """ UPDATE  results
+        SET     setup = 'UVES',
+                node_id = '{uves_node_id}'
+        WHERE   filename LIKE 'u%'
+          AND   setup LIKE 'GIRAFFE%'
+          AND   node_id = '{giraffe_node_id}';
+    """.format(giraffe_node_id=giraffe_node_id, uves_node_id=uves_node_id))
+
 database.connection.commit()

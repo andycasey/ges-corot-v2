@@ -43,7 +43,7 @@ def _guess_parameter_names(table, names):
 
 
 def _homogenise_survey_measurements(database, wg, parameter, cname, N=100,
-    stan_model=None, update_database=True, **kwargs):
+    stan_model=None, update_database=True, sql_constraint=None, **kwargs):
     """
     Produce an unbiased estimate of an astrophyiscal parameter for a given
     survey object.
@@ -68,18 +68,24 @@ def _homogenise_survey_measurements(database, wg, parameter, cname, N=100,
         the data dictionary (`stan_chains` and `stan_data`) must be provided.
     """
 
+    sql_constraint = \
+        "" if sql_constraint is None else " AND {}".format(sql_constraint)
+
     # Get the data for this object.
     estimates = database.retrieve_table(
         """ SELECT  DISTINCT ON (filename, node_id)
-                    results.id, cname, node_id, snr, trim(filename) as filename, 
-                    teff, logg, feh
+                    results.id, cname, node_id, snr, setup, trim(filename) as filename, 
+                    teff, logg, feh,
+                    passed_quality_control
             FROM    results, nodes
             WHERE   nodes.wg = {wg}
               AND   nodes.id = results.node_id
               AND   cname = '{cname}'
               AND   {parameter} <> 'NaN'
-              AND   passed_quality_control = true;
-        """.format(wg=wg, cname=cname, parameter=parameter))
+              AND   passed_quality_control = true
+              {sql_constraint};
+        """.format(wg=wg, cname=cname, parameter=parameter, 
+                sql_constraint=sql_constraint))
 
     if estimates is None:
         return np.nan * np.ones(4)
@@ -133,10 +139,7 @@ def _homogenise_survey_measurements(database, wg, parameter, cname, N=100,
 
         # Weighted mean from each node first (over many observations)
         mu_node = np.zeros(M)
-        var_node_sys = np.zeros(M)
-        var_node_rand = np.zeros(M)
-        var_node_stat = np.zeros(M)
-
+        var_node = np.zeros(M)
         node_ids = np.zeros(M)
 
 
@@ -148,12 +151,10 @@ def _homogenise_survey_measurements(database, wg, parameter, cname, N=100,
             node_ids[j] = estimates["node_id"][s]
 
             # Get the 'unbiased' values.
-            mu = np.array(
+            mu_node[j] = np.array(
                 estimates[parameter][s:e] - samples["biases"][i, k])
 
-            spectrum_snr = np.clip(estimates["snr"][s:e], 1, 500)
-            
-            var_node_sys[j] = (samples["sigma_sys_constant"][i, k] * (4.0 
+            var_node[j] = (samples["sigma_sys_constant"][i, k] * (4.0 
                 + samples["vs_ta{}".format(k + 1)][i] * xs[0]**2
                 + samples["vs_la{}".format(k + 1)][i] * xs[1]**2
                 + samples["vs_fa{}".format(k + 1)][i] * xs[2]**2
@@ -165,30 +166,12 @@ def _homogenise_survey_measurements(database, wg, parameter, cname, N=100,
                 + samples["vs_tc9"][i, k] * xs[1] * xs[2]
             ))**2
 
-
-            diag_variance = (samples["alpha_sq"][i, k]/spectrum_snr) \
-                          + var_node_sys[j]
-
-            C = np.eye(L) * diag_variance
-
-            W = np.ones((L, 1))
-            Cinv = np.linalg.inv(C)
-            
-            # Get the weighted mean for this node, and the statistical
-            # uncertainty associated with that estimate.
-            var_node_stat[j] = 1.0/np.dot(np.dot(W.T, Cinv), W)
-            mu_node[j] = var_node_stat[j] * np.dot(np.dot(W.T, Cinv), mu)
-
-            weights = 1.0/diag_variance
-            var_node_rand[j] \
-                = np.sqrt(np.sum(weights * (mu - mu_node[j])**2)/np.sum(weights))
-
         node_ids = node_ids.astype(int)
 
         # Construct the covariance matrix for node-to-node measurements.
         # (This includes the systematic component.)
         I = np.eye(M)
-        C = I * (var_node_rand + var_node_sys + var_node_stat)
+        C = I * var_node
 
         L = samples["L_corr"][i]
         rho = np.dot(
@@ -209,39 +192,48 @@ def _homogenise_survey_measurements(database, wg, parameter, cname, N=100,
         Cinv = np.dot(np.dot(V.T, np.linalg.inv(np.diag(s))), U.T)
 
         var = 1.0/np.dot(np.dot(W.T, Cinv), W)
+        mu = np.abs(var) * np.dot(np.dot(W.T, Cinv), mu_node)
 
         if var < 0:
             logger.warn("Negative variance returned!")
             raise a
 
-        mu = np.abs(var) * np.dot(np.dot(W.T, Cinv), mu_node)
-
         mu_samples[ii] = mu
         var_samples[ii] = var
-        
+
+
+    """        
     # We have some distribution of mu now (with a statistical uncertainty)
     c = np.percentile(mu_samples, [16, 50, 84])
     central, pos_error, neg_error = (c[1], c[2] - c[1], c[0] - c[1])
+
     stat_error = np.median(np.sqrt(var_samples))
     # stat_error**2 ~= sys_error**2 + rand_error**2
     # sys_error**2 ~= stat_error**2 - rand_error**2
     # sys_error ~= sqrt(stat_error**2 - rand_error**2)
     sys_error = np.sqrt(
         stat_error**2 - np.max([pos_error, np.abs(neg_error)])**2)
+    """
+
+    # We have posteriors on the mu and the variance.
+    # Here we will only report the 50th percentile of each.
+    tiles = np.percentile(mu_samples, [16, 50, 84])
+    mu, pos_uncertainty, neg_uncertainty = (tiles[0], tiles[2] - tiles[1], tiles[0] - tiles[1])
+    symmetric_uncertainty = np.max(np.abs([pos_uncertainty, neg_uncertainty]))
 
     if update_database:
         data = {
             "wg": wg, 
             "cname": cname, 
             "snr": np.nanmedian(np.clip(estimates["snr"], 1, 500)),
-            parameter: central, 
-            "e_pos_{}".format(parameter): pos_error, 
-            "e_neg_{}".format(parameter): neg_error, 
-            "e_{}".format(parameter): stat_error,
+            parameter: mu, 
+            "e_pos_{}".format(parameter): pos_uncertainty, 
+            "e_neg_{}".format(parameter): neg_uncertainty, 
+            "e_{}".format(parameter): symmetric_uncertainty,
             "nn_nodes_{}".format(parameter): len(set(estimates["node_id"])),
             "nn_spectra_{}".format(parameter): len(set(estimates["filename"])),
             "provenance_ids_for_{}".format(parameter): list(estimates["id"].data.astype(int)),
-            "sys_err_{}".format(parameter): sys_error
+            #"sys_err_{}".format(parameter): sys_error
         }
 
         record = database.retrieve(
@@ -262,7 +254,7 @@ def _homogenise_survey_measurements(database, wg, parameter, cname, N=100,
             logger.info(
                 "Updated record {} in wg_recommended_results".format(record[0][0]))
 
-            print(wg, cname, parameter, central, pos_error, neg_error, stat_error)
+            print(wg, cname, parameter, mu, pos_uncertainty, neg_uncertainty, symmetric_uncertainty)
 
         else:
             new_record = database.retrieve(
@@ -274,7 +266,7 @@ def _homogenise_survey_measurements(database, wg, parameter, cname, N=100,
                 "Created new record {} in wg_recommended_results ({} / {})"\
                 .format(new_record[0][0], wg, cname))
 
-    return (central, pos_error, neg_error, stat_error)
+    return (mu, pos_uncertainty, neg_uncertainty, symmetric_uncertainty)
 
 
 

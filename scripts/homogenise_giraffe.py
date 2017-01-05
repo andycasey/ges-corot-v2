@@ -29,15 +29,18 @@ benchmarks = Table.read("fits-templates/benchmarks/GES_iDR5_FGKM_Benchmarks_ARC_
 benchmarks = benchmarks[benchmarks["TEFF"] < 8000]
 benchmarks["E_FEH"] = 0.05
 
-model_paths = "homogenisation-giraffe-{parameter}.model"
+model_paths = "homogenisation-giraffe-wg{wg}-{parameter}.model"
 
 wgs = (1, )
 parameter_scales = OrderedDict([
     ("teff", 250),
-    ("feh", 0.10)
+    ("feh", 0.10),
 ])
 
-sample_kwds = dict(chains=4, iter=10000)
+lower_sigma = dict(teff=10, feh=0.01)
+
+
+sample_kwds = dict(chains=4, iter=20000)
 
 finite = np.isfinite(benchmarks["TEFF"] * benchmarks["LOGG"] * benchmarks["FEH"])
 benchmarks = benchmarks[finite]
@@ -54,12 +57,12 @@ for wg in wgs:
             
         else:
             model = EnsembleModel(database, wg, parameter, benchmarks, 
-                model_path="code/model/ensemble-model-4node.stan")
+                model_path="code/model/ensemble-model-4node.stan" if parameter == "teff" else "code/model/ensemble-model-3node.stan")
             data, metadata = model._prepare_data(
-                default_sigma_calibrator=scale, sql_constraint="n.id in (10, 11, 13, 14, 15)")
+                default_sigma_calibrator=scale, sql_constraint="n.name like 'GIRAFFE-%'")
             assert all([n.startswith("GIRAFFE-") for n in metadata["node_names"]])
 
-
+            data["lower_sigma"] = lower_sigma[parameter]
             init = {
                 "truths": data["mu_calibrator"],
                 "biases": np.zeros(data["N"]),
@@ -87,8 +90,13 @@ for wg in wgs:
             op_params = model.optimize(data, init=init, iter=100000)
             fit = model.sample(data, init=op_params, **sample_kwds)
 
-            model.write(model_path, overwrite=True, 
-                __ignore_model_pars=("Sigma", "full_rank_estimates"))
+            model.write(model_path, overwrite=True)
+
+
+        model.homogenise_stars_matching_query(
+            "SELECT DISTINCT ON (cname) cname FROM results WHERE setup LIKE 'GIRAFFE%'",
+            sql_constraint="setup like 'GIRAFFE%'")
+
 
 
 

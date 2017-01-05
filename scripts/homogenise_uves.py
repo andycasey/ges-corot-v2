@@ -33,9 +33,11 @@ model_paths = "homogenisation-uves-wg{wg}-{parameter}.model"
 
 wgs = (1, )
 parameter_scales = OrderedDict([
-    ("teff", 250),
+    ("teff", 250.0),
     ("feh", 0.10)
 ])
+
+lower_sigma = dict(teff=10, feh=0.01)
 
 sample_kwds = dict(chains=4, iter=20000)
 
@@ -54,12 +56,13 @@ for wg in wgs:
             
         else:
             model = EnsembleModel(database, wg, parameter, benchmarks,
-                model_path="code/model/ensemble-model-4node.stan")
+                model_path="code/model/ensemble-model-5node.stan")
             data, metadata = model._prepare_data(
                 default_sigma_calibrator=scale, 
                 sql_constraint="n.name like 'UVES-%'")
             assert all([n.startswith("UVES-") for n in metadata["node_names"]])
-
+            
+            data["lower_sigma"] = lower_sigma[parameter]
             init = {
                 "truths": data["mu_calibrator"],
                 "biases": np.zeros(data["N"]),
@@ -86,5 +89,6 @@ for wg in wgs:
 
 
         model.homogenise_stars_matching_query(
-            "SELECT DISTINCT ON (cname) cname FROM results WHERE setup LIKE 'UVES%'")
-        
+            "SELECT DISTINCT ON (cname) cname FROM results WHERE setup LIKE 'UVES%'",
+            sql_constraint="setup like 'UVES%'")
+
