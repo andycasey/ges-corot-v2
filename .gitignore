@@ -3,3 +3,6 @@ figures/
 *.png
 *.model
 *.stan.compiled
+
+#secretsquirrel
+node-results/
