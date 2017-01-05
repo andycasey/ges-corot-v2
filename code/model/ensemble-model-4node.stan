@@ -208,6 +208,7 @@ transformed parameters {
                         full_rank_estimates[c, n, v] = estimates[c, n, v] - biases[n];
                     }
                 }
+                
                 // Construct the covariance matrix from Cholesky factors
                 Sigma[vi] = diag_pre_multiply(sigma, L_corr) 
                           * diag_pre_multiply(sigma, L_corr)';

@@ -805,6 +805,14 @@ class BaseEnsembleModel(object):
         return plot.node_correlations(self, **kwargs)
 
 
+    def plot_biases(self, **kwargs):
+        return plot.biases(self, **kwargs)
+
+
+    def plot_minimum_node_uncertainty(self, node_name, **kwargs):
+        return plot.minimum_node_uncertainty(self, node_name, **kwargs)
+
+
 
 class EnsembleModel(BaseEnsembleModel):
 
@@ -845,7 +853,7 @@ class EnsembleModel(BaseEnsembleModel):
         #       on to CNAMEs in the calibrator list.
         data = self._database.retrieve_table(
             """ WITH    n AS (
-                            SELECT id FROM nodes WHERE wg = {wg}), 
+                            SELECT id, name FROM nodes WHERE wg = {wg}), 
                         s AS (
                             SELECT cname, ges_type, ges_fld
                             FROM spectra
@@ -988,8 +996,8 @@ class EnsembleModel(BaseEnsembleModel):
             "TM": np.sum(is_missing),
 
             "estimates": estimates,
-            "spectrum_ivar": spectrum_ivar.T,
-            "spectrum_isnr": 1.0/np.sqrt(spectrum_ivar.T),
+            #"spectrum_ivar": spectrum_ivar.T,
+            #"spectrum_isnr": 1.0/np.sqrt(spectrum_ivar.T),
 
             "mu_calibrator": mu_calibrator,
             "sigma_calibrator": sigma_calibrator,
@@ -999,9 +1007,9 @@ class EnsembleModel(BaseEnsembleModel):
                 [calibrators[p] for p in ("TEFF", "LOGG", "FEH")]).T
         }
 
-        alpha_bounds = dict(teff=(100, 1000), logg=(0.1, 1.0), feh=(0.1, 1.0))
-        data_dict.update(
-            dict(zip(("lower_alpha_sq", "upper_alpha_sq"), np.array(alpha_bounds[parameter])**2)))
+        #alpha_bounds = dict(teff=(100, 1000), logg=(0.1, 1.0), feh=(0.1, 1.0))
+        #data_dict.update(
+        #    dict(zip(("lower_alpha_sq", "upper_alpha_sq"), np.array(alpha_bounds[parameter])**2)))
 
         bounds = dict(teff=(3000, 8000), logg=(0, 5), feh=(-3.5, 0.5))
         data_dict.update(

@@ -8,6 +8,7 @@ import logging
 import yaml
 
 from code import GESDatabase
+from code.gesdb import UnknownNodeError
 
 # Connect to database.
 db_filename = "db.yaml"
@@ -267,5 +268,49 @@ for key, value in qc_flags.get("node_specific_flags", {}).items():
                 "Marked {} results as poor quality due to matching flag {} "\
                 "and constraint {}".format(N, flag, constraint))
 
+
+database.connection.commit()
+
+
+# Removing all results for UVES/Damiani because the benchmark values are exactly
+# the same as the accepted values.
+try:
+    node_id = database.retrieve_node_id(1, "UVES-Damiani")
+
+except UnknownNodeError:
+    None
+
+else:
+    database.execute(
+        "UPDATE results SET passed_quality_control = false WHERE node_id = %s", 
+        (node_id, ))
+
+# Remove all Elena/Carmela results because they are +/- (50*n) K multiples offset
+# from the accepted values.
+try:
+    node_id = database.retrieve_node_id(1, "UVES-Carmela-Elena")
+
+except UnknownNodeError:
+    None
+
+else:
+    database.execute(
+        "UPDATE results SET passed_quality_control = false WHERE node_id = %s",
+        (node_id, ))
+
+
+# Remove superfluous nodes.
+contributing_node_ids = database.retrieve_table(
+    """ SELECT DISTINCT ON (node_id) node_id
+        FROM results
+        WHERE (teff <> 'NaN' AND passed_quality_control) 
+    """)["node_id"]
+
+all_node_ids = database.retrieve_table("SELECT id FROM nodes")["id"]
+superfluous_node_ids = list(set(all_node_ids).difference(contributing_node_ids))
+for node_id in superfluous_node_ids:
+    database.execute("DELETE FROM nodes WHERE id = %s", (node_id, ))
+
+logger.info("Removed {} superfluous nodes".format(len(superfluous_node_ids)))
 
 database.connection.commit()

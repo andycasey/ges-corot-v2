@@ -516,7 +516,9 @@ def _node_correlations_animated(model, reorder=True, plot_edges=True, frames=100
 
 def _node_correlations(model, reorder=True, plot_edges=True, **kwargs):
 
-    node_names = np.array(model._metadata["node_names"])
+    format_node_name = kwargs.get("format_node_name", str)
+    node_names = np.array(map(format_node_name, model._metadata["node_names"]))
+
     S, N, _ = model._chains["L_corr"].shape
     assert N == len(node_names)
 
@@ -656,6 +658,8 @@ def biases(model, ax=None, N_bins=50, xlabel=None, legend=True, **kwargs):
     else:
         fig, ax = ax.figure, ax
 
+    format_node_name = kwargs.get("format_node_name", str)
+
     N = model._chains["biases"].shape[1]
 
     colors = brewer2mpl.get_map("Set1", "qualitative", N).mpl_colors
@@ -669,7 +673,7 @@ def biases(model, ax=None, N_bins=50, xlabel=None, legend=True, **kwargs):
         ax.hist(model._chains["biases"][:, i], 
             facecolor=colors[i], edgecolor=colors[i], bins=bins, 
             alpha=0.5, lw=2, normed=True, histtype="stepfilled",
-            label=r"${{\rm {0}}}$".format(node_name.strip()))
+            label=r"${{\rm {0}}}$".format(format_node_name(node_name)))
 
     latex_labels = {
         "teff": r"${\rm Bias}$ ${\rm in}$ ${\rm effective}$ ${\rm temperature},$ "
@@ -706,3 +710,185 @@ def biases(model, ax=None, N_bins=50, xlabel=None, legend=True, **kwargs):
 
 
 
+
+def minimum_node_uncertainty(model, node_name, vmin=None, vmax=None, **kwargs):
+    """
+    Show the minimum 1\sigma uncertainty from a node as a function of stellar
+    parameter space.
+    
+    :param model:
+        A trained ensemble model.
+
+    :param node_name:
+        The name of the node.
+    """
+
+    try:
+        index = list(model._metadata["node_names"]).index(node_name)
+    except ValueError:
+        raise ValueError("node {} is not part of this model".format(node_name))
+
+    cmap = kwargs.get("cmap", "viridis")
+    slicer = kwargs.get("slicer", np.mean)
+
+    extents = kwargs.get("extents", None)
+    if extents is None:
+        N = kwargs.get("N", 10)
+        extents = {
+            "teff": (3000, 8000, N),
+            "logg": (0, 5.0, N),
+            "feh": (-3.0, 0.5, N)
+        }
+
+    # Get scales and offsets for AMCS calculations.
+    teff_offset = np.min(model._data["all_mu_calibrator"][:, 0])
+    teff_scale = np.max(model._data["all_mu_calibrator"][:, 0]) - teff_offset
+    logg_offset = np.min(model._data["all_mu_calibrator"][:, 1])
+    logg_scale = np.max(model._data["all_mu_calibrator"][:, 1]) - logg_offset
+    feh_offset = np.min(model._data["all_mu_calibrator"][:, 2])
+    feh_scale = np.max(model._data["all_mu_calibrator"][:, 2]) - feh_offset
+    
+    sigmas = []
+    points = []
+    for t, teff in enumerate(np.linspace(*extents["teff"])):
+        for l, logg in enumerate(np.linspace(*extents["logg"])):
+            for f, feh in enumerate(np.linspace(*extents["feh"])):
+
+                # Calculate the AMCS.
+                teff_norm = np.clip(1.0 - (teff - teff_offset)/teff_scale, 0, 1)
+                logg_norm = np.clip(1.0 - (logg - logg_offset)/logg_scale, 0, 1)
+                feh_norm = np.clip(1.0 - (feh - feh_offset)/feh_scale, 0, 1)
+                
+                AMCS = np.array([
+                    teff_norm**2, logg_norm**2, feh_norm**2,
+                    teff_norm, logg_norm, feh_norm,
+                    teff_norm * logg_norm, 
+                    teff_norm * feh_norm,
+                    logg_norm * feh_norm
+                ]).reshape(-1, 1)
+
+                # Calculate the minimum uncertainty for this node.
+                constant = model._chains["sigma_sys_constant"][:, index]
+
+                theta = np.array([
+                    model._chains["vs_ta{}".format(index + 1)],
+                    model._chains["vs_la{}".format(index + 1)],
+                    model._chains["vs_fa{}".format(index + 1)],
+                    model._chains["vs_tb{}".format(index + 1)],
+                    model._chains["vs_lb{}".format(index + 1)],
+                    model._chains["vs_fb{}".format(index + 1)],
+                    model._chains["vs_tc7"][:, index],
+                    model._chains["vs_tc8"][:, index],
+                    model._chains["vs_tc9"][:, index]
+                ])
+                relative_sigma = np.sum(theta * AMCS, axis=0)
+
+                sigma = slicer(constant * (4.0 + relative_sigma))
+                
+                points.append([teff, feh, logg])
+                sigmas.append(sigma)
+
+
+    points = np.array(points)
+    sigmas = np.array(sigmas)
+
+    labels = ("TEFF", "FEH", "LOGG")
+    K = len(labels)
+
+    factor = 2.0           # size of one side of one panel
+    lbdim = 0.5 * factor   # size of left/bottom margin
+    trdim = 0.5 * factor   # size of top/right margin
+    whspace = 0.15         # w/hspace size
+    plotdim = factor * (K - 1.) + factor * (K - 2.) * whspace
+    dim = lbdim + plotdim + trdim
+
+    fig, axes = plt.subplots(K - 1, K - 1, figsize=(dim, dim))
+    if 3 > K:
+        axes = np.atleast_2d([axes])
+
+    lb = lbdim / dim
+    tr = (lbdim + plotdim) / dim
+    fig.subplots_adjust(left=lb, bottom=lb, right=tr, top=tr,
+        wspace=whspace, hspace=whspace)
+    
+    data = {}
+    for i in range(1, K):
+        for j in range(K):
+            if j >= i:
+                try:
+                    ax = axes[i-1, j]
+                except IndexError:
+                    continue
+                ax.set_visible(False)
+                ax.set_frame_on(False)
+                continue
+
+            ax_indices = (i - 1, j)
+
+            # Get the projection index.
+            k = list(set(range(3)).difference([i, j]))[0]
+            
+            # Get unique points along projection.
+            indices = np.sort(list(set(range(3)).difference([k])))
+            projected_points = np.vstack({tuple(row) for row in points[:, indices]})
+
+            projected_minimum_sigma = np.nan * np.ones(len(projected_points))
+            for p, projected_point in enumerate(projected_points):
+
+                matches = np.all(points[:, indices] == projected_point, axis=1)
+                projected_minimum_sigma[p] = np.min(sigmas[matches])
+
+            x, y = projected_points.T
+            data[ax_indices] = (x, y, projected_minimum_sigma)
+
+    values = np.vstack([v[-1] for v in data.values()])
+    vmin, vmax = (vmin or values.min(), vmax or values.max())
+    
+    for i in range(1, K):
+        for j in range(K):
+            if j >= i:
+                try:
+                    ax = axes[i-1, j]
+                except IndexError:
+                    continue
+                ax.set_visible(False)
+                ax.set_frame_on(False)
+                continue
+
+            ax = axes[i - 1, j]
+            x, y, sigma = data[(i - 1, j)]
+
+            scat = ax.scatter(
+                x, y, c=sigma, s=100, vmin=vmin, vmax=vmax, cmap=cmap)
+
+            if j == 0:
+                ax.set_xlim(ax.get_xlim()[::-1])
+            if i == 2:
+                ax.set_ylim(ax.get_ylim()[::-1])
+
+            if ax.is_first_col():
+                ax.set_ylabel(labels[i])
+            else:
+                ax.set_yticklabels([])
+
+            if ax.is_last_row():
+                ax.set_xlabel(labels[j])
+            else:
+                ax.set_xticklabels([])
+
+            ax.xaxis.set_major_locator(MaxNLocator(6))
+            ax.yaxis.set_major_locator(MaxNLocator(6))
+
+    cbar = plt.colorbar(scat, ax=axes[0, 1], orientation="horizontal")
+    kwds = dict(node_name=node_name, parameter=model._parameter)
+
+    colorbar_label = kwargs.get(
+        "colorbar_label", "{node_name} uncertainty in {parameter}")
+    cbar.set_label(colorbar_label.format(**kwds))
+    cbar.ax.xaxis.set_major_locator(MaxNLocator(4))
+
+    axes[0, 1].set_visible(True)
+    fig.tight_layout()
+    axes[0, 1].set_visible(False)
+    
+    return fig

@@ -29,7 +29,7 @@ benchmarks = Table.read("fits-templates/benchmarks/GES_iDR5_FGKM_Benchmarks_ARC_
 benchmarks = benchmarks[benchmarks["TEFF"] < 8000]
 benchmarks["E_FEH"] = 0.05
 
-model_paths = "homogenisation-uves-{parameter}.model"
+model_paths = "homogenisation-uves-wg{wg}-{parameter}.model"
 
 wgs = (1, )
 parameter_scales = OrderedDict([
@@ -37,9 +37,9 @@ parameter_scales = OrderedDict([
     ("feh", 0.10)
 ])
 
-sample_kwds = dict(chains=4, iter=10000)
+sample_kwds = dict(chains=4, iter=20000)
 
-finite = np.isfinite(benchmarks["TEFF"] * benchmarks["FEH"])
+finite = np.isfinite(benchmarks["TEFF"] * benchmarks["LOGG"] * benchmarks["FEH"])
 benchmarks = benchmarks[finite]
 
 models = {}
@@ -53,11 +53,12 @@ for wg in wgs:
             model = EnsembleModel.read(model_path, database)
             
         else:
-            model = EnsembleModel(database, wg, parameter, benchmarks)
+            model = EnsembleModel(database, wg, parameter, benchmarks,
+                model_path="code/model/ensemble-model-4node.stan")
             data, metadata = model._prepare_data(
-                default_sigma_calibrator=scale, sql_constraint="n.id not in (10, 11, 13, 14, 15)")
+                default_sigma_calibrator=scale, 
+                sql_constraint="n.name like 'UVES-%'")
             assert all([n.startswith("UVES-") for n in metadata["node_names"]])
-
 
             init = {
                 "truths": data["mu_calibrator"],
@@ -68,33 +69,22 @@ for wg in wgs:
                 "L_corr": np.eye(data["N"])
             }
 
-            init.update({"vs_tb{}".format(i): 1 for i in range(1, 9)})
-            init.update({"vs_lb{}".format(i): 1 for i in range(1, 9)})
-            init.update({"vs_fb{}".format(i): 1 for i in range(1, 9)})
+            # Polynomial coefficients
+            for i in range(1, 9):
+                for tlf in "tlf":
+                    for j, ba in enumerate("ba", start=1):
+                        init["vs_{tlf}{ba}{i}".format(i=i, tlf=tlf, ba=ba)] = j
 
-            init.update({"vs_ta{}".format(i): 2 for i in range(1, 9)})
-            init.update({"vs_la{}".format(i): 2 for i in range(1, 9)})
-            init.update({"vs_fa{}".format(i): 2 for i in range(1, 9)})
-            
-            init["vs_tc7"] = 1 * np.ones(data["N"])
-            init["vs_tc8"] = 1 * np.ones(data["N"])
-            init["vs_tc9"] = 1 * np.ones(data["N"])
+            for i in range(7, 10):
+                init["vs_tc{}".format(i)] = np.ones(data["N"])
 
-            print("Number of model parameters for {}: {}".format(parameter,
-                sum([np.array(v).size for v in init.values()])))
-
+            # Optimize and sample.
             op_params = model.optimize(data, init=init, iter=100000)
             fit = model.sample(data, init=op_params, **sample_kwds)
 
-            model.write(model_path, overwrite=True, 
-                __ignore_model_pars=("Sigma", "full_rank_estimates"))
+            model.write(model_path, overwrite=True)
 
 
-
-        #model.homogenise_all_stars(update_database=True)
-        #model.homogenise_stars_matching_query(
-        #    """SELECT distinct on (r.cname) r.cname FROM results as r, spectra as s, nodes as n where n.id = r.node_id and s.cname = r.cname and (
-        #        s.ges_type like '%_OC%' or s.ges_type like '%_GC%' or s.ges_type like '%_CL%') and n.wg = 11""")
-        #model.homogenise_stars_matching_query(
-        #    """SELECT distinct on (r.cname) r.cname FROM results as r, spectra as s, nodes as n where n.wg = 11 and s.cname = r.cname and s.ges_fld like 'Rup134%'""")
+        model.homogenise_stars_matching_query(
+            "SELECT DISTINCT ON (cname) cname FROM results WHERE setup LIKE 'UVES%'")
         
