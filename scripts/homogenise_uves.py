@@ -33,8 +33,9 @@ model_paths = "homogenisation-uves-wg{wg}-{parameter}.model"
 
 wgs = (1, )
 parameter_scales = OrderedDict([
+    ("feh", 0.10),
     ("teff", 250.0),
-    ("feh", 0.10)
+
 ])
 
 lower_sigma = dict(teff=10, feh=0.01)
@@ -56,12 +57,16 @@ for wg in wgs:
             
         else:
             model = EnsembleModel(database, wg, parameter, benchmarks,
-                model_path="code/model/ensemble-model-5node.stan")
+                model_path="code/model/ensemble-model-4node.stan")# if parameter == "teff" else "code/model/ensemble-model-3node.stan")
             data, metadata = model._prepare_data(
                 default_sigma_calibrator=scale, 
                 sql_constraint="n.name like 'UVES-%'")
             assert all([n.startswith("UVES-") for n in metadata["node_names"]])
-            
+            if parameter == "teff":
+                assert data["N"] == 4
+            else:
+                assert data["N"] == 4
+
             data["lower_sigma"] = lower_sigma[parameter]
             init = {
                 "truths": data["mu_calibrator"],

@@ -6,6 +6,7 @@ import numpy as np
 from astropy.io import fits
 from astropy.table import Table
 from datetime import datetime
+from subprocess import check_output
 
 import utils
 from db import Database
@@ -38,6 +39,20 @@ def homogenised_catalog(database, input_path, output_path, wg, ext=-1,
         Overwrite the `output_path` if it already exists.
     """
 
+
+    """
+    "logg",
+    "e_logg",
+    "e_pos_logg",
+    "e_neg_logg",
+    "nn_nodes_logg",
+    "nn_spectra_logg",
+    "enn_logg",
+    "nne_logg",
+    "sys_err_logg",
+    "lim_logg",
+    """
+
     columns = [
         "teff",
         "e_teff",
@@ -48,17 +63,6 @@ def homogenised_catalog(database, input_path, output_path, wg, ext=-1,
         "enn_teff",
         "nne_teff",
         "sys_err_teff",
-        
-        "logg",
-        "e_logg",
-        "e_pos_logg",
-        "e_neg_logg",
-        "nn_nodes_logg",
-        "nn_spectra_logg",
-        "enn_logg",
-        "nne_logg",
-        "sys_err_logg",
-        "lim_logg",
         
         "feh",
         "e_feh",
@@ -100,7 +104,7 @@ def homogenised_catalog(database, input_path, output_path, wg, ext=-1,
 
     translations = {
         "nn_nodes_teff": "NN_TEFF",
-        "nn_nodes_logg": "NN_LOGG",
+        #"nn_nodes_logg": "NN_LOGG",
         "nn_nodes_feh": "NN_FEH",
         "nn_nodes_mh": "NN_MH",
         "nn_nodes_xi": "NN_XI",
@@ -185,7 +189,7 @@ def homogenised_catalog(database, input_path, output_path, wg, ext=-1,
     # It's stupid that we should ever have to do this.
     propagate_columns = {
         "NN_TEFF": ("ENN_TEFF", "NNE_TEFF"),
-        "NN_LOGG": ("ENN_LOGG", "NNE_LOGG"),
+        #"NN_LOGG": ("ENN_LOGG", "NNE_LOGG"),
         "NN_FEH": ("ENN_FEH", "NNE_FEH"),
     }
     for column, propagate_to_columns in propagate_columns.items():
@@ -234,6 +238,7 @@ def homogenised_catalog(database, input_path, output_path, wg, ext=-1,
 
         else:
             tech = "|".join(sorted(map(str.strip, list(set(record["tech"][0].split("|"))))))
+            tech = tech.strip(" |")
             concatenated_tech.append(tech)
 
             max_length = max([max_length, len(tech)])
@@ -252,19 +257,18 @@ def homogenised_catalog(database, input_path, output_path, wg, ext=-1,
         if max_length > 250:
             logger.warn("Some TECH flags are going to be truncated!")
         image[ext].data["TECH"] = concatenated_tech
-
+    
     # Update the release date.
     now = datetime.now()
-    image[0].header["DATETAB"] = "{year}-{month}-{day}".format(
+    image[ext].header["DATETAB"] = "{year}-{month}-{day}".format(
         year=now.year, month=now.month, day=now.day)
-
+    
     # Create a temporary HDU
     hdu = fits.BinTableHDU()
     hdu.header.update({
-        "RELEASE": image[0].header["RELEASE"],
-        "DATETAB": image[0].header["DATETAB"],
+        #"RELEASE": image[0].header["RELEASE"],
+        "DATETAB": image[ext].header["DATETAB"],
         #"INSTRUME": image[0].header["INSTRUME"],
-        ##"NODE1": "WG{}".format(wg),
         #"EXTNAME": "WGParametersWGAbundancesAdd",
         #"EXTDUMMY": True,
         #"COMMENT": "GES WG Recommended Parameters and Abundances"
@@ -273,12 +277,16 @@ def homogenised_catalog(database, input_path, output_path, wg, ext=-1,
         del hdu.header["SIMPLE"]
     hdu.verify("fix")
 
-    for column_name in ("ENN_TEFF", "ENN_LOGG", "ENN_FEH"):
-        image[1].data[column_name] = image[1].data[column_name.replace("ENN_", "E_")]
+    #for column_name in ("ENN_TEFF", "ENN_LOGG", "ENN_FEH"):
+    #    image[1].data[column_name] = image[1].data[column_name.replace("ENN_", "E_")]
         
     for column_name in ("NN_TEFF", "NN_LOGG", "NN_FEH", "NNE_TEFF", "NNE_LOGG", "NNE_FEH"):
         no_results = image[1].data[column_name] == 0
         image[1].data[column_name][no_results] = -1
+        for column in ("TEFF", "FEH"):
+            image[1].data[column][no_results] = np.nan
+            image[1].data["E_{}".format(column)][no_results] = np.nan
+        
 
     # Update with other nodes that contributed.
     contributed_nodes = database.retrieve_table(
@@ -290,8 +298,12 @@ def homogenised_catalog(database, input_path, output_path, wg, ext=-1,
                            AND r.passed_quality_control)
             ORDER BY n.name ASC""", (wg, ))
 
-    for i, node_name in enumerate(contributed_nodes["name"]):
-        image[0].header["NODE{:.0f}".format(i + 2)] = node_name
+    # Get the git hash
+    git_hash = check_output("git rev-parse --short HEAD".split()).strip()
+    image[0].header["NODE1"] = "Casey-homogenisation-{}".format(git_hash)
+
+    for i, node_name in enumerate(contributed_nodes["name"], start=2):
+        image[0].header["NODE{:.0f}".format(i)] = node_name
 
     image.append(hdu)
     image.writeto(output_path, clobber=overwrite)

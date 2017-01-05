@@ -5,6 +5,7 @@ Propagate relevant flag information from one node to others.
 """
 
 import logging
+import numpy as np
 import yaml
 
 from code import GESDatabase
@@ -38,15 +39,12 @@ database.update(
                 passed_quality_control = true
          WHERE  passed_quality_control = false;""")
 
-
-
-
 database.connection.commit()
 
 # Identify spurious spectra and mark them as such.
 N_peculiar_spectra = {}
 peculiar_spectra_kwds = dict(
-    and_or="and", sigma_discrepant=3, teff_discrepant=250, logg_discrepant=0.25)
+    and_or="and", sigma_discrepant=3, teff_discrepant=250, feh_discrepant=1.0)
 
 for wg in (1, ):
 
@@ -57,8 +55,8 @@ for wg in (1, ):
 
     peculiar_spectrum_query = """
         with t4 as (
-        select id, cname, filename, avg_filename_teff, avg_cname_teff, stddev_cname_teff, abs((avg_cname_teff - avg_filename_teff)/(0.00001 + stddev_cname_teff)) as abs_sigma_teff_discrepant, avg_filename_logg, avg_cname_logg, stddev_cname_logg, abs((avg_cname_logg - avg_filename_logg)/(0.00001 + stddev_cname_logg)) as abs_sigma_logg_discrepant FROM (with ar as (select distinct on (filename) id, cname, trim(filename) as filename, avg(teff) over w as avg_filename_teff, avg(logg) over w as avg_filename_logg from (with n as (select id from nodes where wg = {wg}) select distinct on (r.filename, r.node_id) r.id, r.cname, trim(r.filename) as filename, r.node_id, teff, logg from n, results as r where r.node_id = n.id and teff <> 'NaN' or logg <> 'NaN') t window w as (partition by filename)) select ar.id, ar.cname, ar.filename, ar.avg_filename_teff, avg(avg_filename_teff) over w2 as avg_cname_teff, stddev(avg_filename_teff) over w2 as stddev_cname_teff, ar.avg_filename_logg, avg(avg_filename_logg) over w2 as avg_cname_logg, stddev(avg_filename_logg) over w2 as stddev_cname_logg FROM ar window w2 as (partition by cname)) t3)
-        select * from t4 where (t4.abs_sigma_teff_discrepant > {sigma_discrepant} and t4.abs_sigma_teff_discrepant <> 'NaN' and abs(t4.avg_cname_teff - avg_filename_teff) >= {teff_discrepant}) {and_or} (t4.abs_sigma_logg_discrepant > {sigma_discrepant} and abs(t4.avg_cname_logg - t4.avg_filename_logg) >= {logg_discrepant} and t4.abs_sigma_logg_discrepant <> 'NaN') order by cname asc;""".format(
+        select id, cname, filename, avg_filename_teff, avg_cname_teff, stddev_cname_teff, abs((avg_cname_teff - avg_filename_teff)/(0.00001 + stddev_cname_teff)) as abs_sigma_teff_discrepant, avg_filename_feh, avg_cname_feh, stddev_cname_feh, abs((avg_cname_feh - avg_filename_feh)/(0.00001 + stddev_cname_feh)) as abs_sigma_feh_discrepant FROM (with ar as (select distinct on (filename) id, cname, trim(filename) as filename, avg(teff) over w as avg_filename_teff, avg(feh) over w as avg_filename_feh from (with n as (select id from nodes where wg = {wg}) select distinct on (r.filename, r.node_id) r.id, r.cname, trim(r.filename) as filename, r.node_id, teff, feh from n, results as r where r.node_id = n.id and teff <> 'NaN' or feh <> 'NaN') t window w as (partition by filename)) select ar.id, ar.cname, ar.filename, ar.avg_filename_teff, avg(avg_filename_teff) over w2 as avg_cname_teff, stddev(avg_filename_teff) over w2 as stddev_cname_teff, ar.avg_filename_feh, avg(avg_filename_feh) over w2 as avg_cname_feh, stddev(avg_filename_feh) over w2 as stddev_cname_feh FROM ar window w2 as (partition by cname)) t3)
+        select * from t4 where (t4.abs_sigma_teff_discrepant > {sigma_discrepant} and t4.abs_sigma_teff_discrepant <> 'NaN' and abs(t4.avg_cname_teff - avg_filename_teff) >= {teff_discrepant}) {and_or} (t4.abs_sigma_feh_discrepant > {sigma_discrepant} and abs(t4.avg_cname_feh - t4.avg_filename_feh) >= {feh_discrepant} and t4.abs_sigma_feh_discrepant <> 'NaN') order by cname asc;""".format(
             **kwds)
 
     peculiar_spectra = database.retrieve_table(peculiar_spectrum_query)
@@ -285,6 +283,7 @@ else:
         "UPDATE results SET passed_quality_control = false WHERE node_id = %s", 
         (node_id, ))
 
+"""
 # Remove all Elena/Carmela results because they are +/- (50*n) K multiples offset
 # from the accepted values.
 try:
@@ -297,7 +296,7 @@ else:
     database.execute(
         "UPDATE results SET passed_quality_control = false WHERE node_id = %s",
         (node_id, ))
-
+"""
 
 # Remove superfluous nodes.
 contributing_node_ids = database.retrieve_table(
@@ -335,5 +334,39 @@ database.execute(
           AND   setup LIKE 'GIRAFFE%'
           AND   node_id = '{giraffe_node_id}';
     """.format(giraffe_node_id=giraffe_node_id, uves_node_id=uves_node_id))
+
+
+# Identify any spurious results from the same spectrum.
+either, both = (3, 2.5) # sigma thresholds
+
+for wg in (1, ):
+
+    results = database.retrieve_table(
+        """ SELECT id, cname, node_id, teff, feh
+            FROM   results 
+            WHERE  passed_quality_control;""")
+    if results is None: continue
+
+    results = results.group_by("cname")
+    
+    spurious_results = []
+    for group in results.groups:
+
+        teff_sigmas = np.abs((np.nanmedian(group["teff"]) - group["teff"])/np.nanstd(group["teff"]))
+        feh_sigmas = np.abs((np.nanmedian(group["feh"]) - group["feh"])/np.nanstd(group["feh"]))
+
+        both_match = ((teff_sigmas > both) * (feh_sigmas > both))
+        either_match = ((teff_sigmas > either) + (feh_sigmas > either))
+        joint_match = both_match + either_match
+
+        if any(joint_match):
+            spurious_results.extend(group["id"][joint_match])
+
+    if any(spurious_results):
+        database.execute(
+            """ UPDATE  results
+                SET     passed_quality_control = false
+                WHERE   id IN %s
+            """, (tuple(spurious_results), ))
 
 database.connection.commit()

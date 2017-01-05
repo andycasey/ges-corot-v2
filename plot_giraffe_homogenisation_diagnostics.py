@@ -12,7 +12,7 @@ from collections import OrderedDict
 from code import GESDatabase, plot
 from code.model.ensemble import EnsembleModel
 
-PLOT_DIR = "figures/homogenisation/uves/"
+PLOT_DIR = "figures/homogenisation/giraffe/"
 
 # Initialize logging.
 logger = logging.getLogger("ges_corot")
@@ -26,16 +26,16 @@ database = GESDatabase(**credentials)
 wg = 1
 parameters = ("feh", "teff", "feh")
 
-model_paths = "homogenisation-uves-wg{wg}-{parameter}.model"
+model_paths = "homogenisation-giraffe-wg{wg}-{parameter}.model"
 
-plot_kwds = dict(format_node_name=lambda name: name[5:])
+plot_kwds = dict(format_node_name=lambda name: name[8:])
 
 minimum_node_uncertainty_kwds = {
     "teff": dict(vmin=100, vmax=1000),
     "feh": dict(vmin=None, vmax=None)
 }
 
-path_kwds = dict(prefix="ges-corot-uves", wg=1)
+path_kwds = dict(prefix="ges-corot-giraffe", wg=1)
 for parameter in parameters:
 
     path_kwds["parameter"] = parameter

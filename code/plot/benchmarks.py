@@ -278,7 +278,7 @@ def wg_benchmark_performance(database, wg, truths, show_recommended=False,
 
                 else:
                     recommended_diffs[parameter].append([
-                        wg_recommended[parameter.lower()][0] - benchmark[parameter],
+                        (wg_recommended[parameter.lower()][0] or np.nan) - benchmark[parameter],
                         wg_recommended["e_{}".format(parameter.lower())][0]
                     ])
 
@@ -309,6 +309,8 @@ def wg_benchmark_performance(database, wg, truths, show_recommended=False,
             for j, result in enumerate(recommended_diff):
                 if not result: continue
                 mu_diff, sigma = result
+                if not sigma: continue
+                
                 ax.fill_between(
                     [j + 1 - width/2, j + 1 + width/2],
                     [mu_diff - sigma, mu_diff - sigma],
