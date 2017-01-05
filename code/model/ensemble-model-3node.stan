@@ -89,37 +89,27 @@ parameters {
     real vs_tb1;
     real vs_tb2;
     real vs_tb3;
-    real vs_tb4;
 
     real vs_lb1;
     real vs_lb2;
     real vs_lb3;
-    real vs_lb4;
-
 
     real vs_fb1;
     real vs_fb2;
     real vs_fb3;
-    real vs_fb4;
 
 
     real<lower=pow(vs_tb1/2.0, 2)> vs_ta1;
     real<lower=pow(vs_tb2/2.0, 2)> vs_ta2;
     real<lower=pow(vs_tb3/2.0, 2)> vs_ta3;
-    real<lower=pow(vs_tb4/2.0, 2)> vs_ta4;
-
-
 
     real<lower=pow(vs_lb1/2.0, 2)> vs_la1;
     real<lower=pow(vs_lb2/2.0, 2)> vs_la2;
     real<lower=pow(vs_lb3/2.0, 2)> vs_la3;
-    real<lower=pow(vs_lb4/2.0, 2)> vs_la4;
-
 
     real<lower=pow(vs_fb1/2.0, 2)> vs_fa1;
     real<lower=pow(vs_fb2/2.0, 2)> vs_fa2;
     real<lower=pow(vs_fb3/2.0, 2)> vs_fa3;
-    real<lower=pow(vs_fb4/2.0, 2)> vs_fa4;
 
     real<lower=0> vs_tc7[N]; // Cross term coefficients for teff * logg 
     real<lower=0> vs_tc8[N]; // Cross term coefficients for teff * feh
@@ -178,19 +168,6 @@ transformed parameters {
                                   + vs_tc7[3] * AMCS[7, c]
                                   + vs_tc8[3] * AMCS[8, c]
                                   + vs_tc9[3] * AMCS[9, c];                                  
-
-            relative_sigma_sys[4] = vs_ta4 * AMCS[1, c]
-                                  + vs_la4 * AMCS[2, c]
-                                  + vs_fa4 * AMCS[3, c]
-
-                                  + vs_tb4 * AMCS[4, c]
-                                  + vs_lb4 * AMCS[5, c]
-                                  + vs_fb4 * AMCS[6, c]
-
-                                  + vs_tc7[4] * AMCS[7, c]
-                                  + vs_tc8[4] * AMCS[8, c]
-                                  + vs_tc9[4] * AMCS[9, c];
-
 
             // For each visit of the calibrator
             for (v in 1:visits[c]) {
