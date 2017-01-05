@@ -6,7 +6,7 @@ This repository contains software to perform the statistical homogenisation for 
 Authors
 -------
 
-  - Andrew R. Casey (andrew.casey@monash.edu)
+  - [Andrew R. Casey](andrew.casey@monash.edu) (Cambridge) (Monash)
 
 
 Usage
