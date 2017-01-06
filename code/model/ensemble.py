@@ -219,7 +219,9 @@ def _homogenise_survey_measurements(database, wg, parameter, cname, N=100,
     # Here we will only report the 50th percentile of each.
     tiles = np.percentile(mu_samples, [16, 50, 84])
     mu, pos_uncertainty, neg_uncertainty = (tiles[0], tiles[2] - tiles[1], tiles[0] - tiles[1])
-    symmetric_uncertainty = np.max(np.abs([pos_uncertainty, neg_uncertainty]))
+    
+    sys_error = np.median(var_samples**0.5)
+
 
     if update_database:
         data = {
@@ -229,11 +231,11 @@ def _homogenise_survey_measurements(database, wg, parameter, cname, N=100,
             parameter: mu, 
             "e_pos_{}".format(parameter): pos_uncertainty, 
             "e_neg_{}".format(parameter): neg_uncertainty, 
-            "e_{}".format(parameter): symmetric_uncertainty,
+            "e_{}".format(parameter): sys_error,
             "nn_nodes_{}".format(parameter): len(set(estimates["node_id"])),
             "nn_spectra_{}".format(parameter): len(set(estimates["filename"])),
             "provenance_ids_for_{}".format(parameter): list(estimates["id"].data.astype(int)),
-            #"sys_err_{}".format(parameter): sys_error
+            "sys_err_{}".format(parameter): sys_error
         }
 
         record = database.retrieve(
@@ -254,7 +256,7 @@ def _homogenise_survey_measurements(database, wg, parameter, cname, N=100,
             logger.info(
                 "Updated record {} in wg_recommended_results".format(record[0][0]))
 
-            print(wg, cname, parameter, mu, pos_uncertainty, neg_uncertainty, symmetric_uncertainty)
+            print(wg, cname, parameter, mu, pos_uncertainty, neg_uncertainty, sys_error)
 
         else:
             new_record = database.retrieve(
@@ -266,7 +268,7 @@ def _homogenise_survey_measurements(database, wg, parameter, cname, N=100,
                 "Created new record {} in wg_recommended_results ({} / {})"\
                 .format(new_record[0][0], wg, cname))
 
-    return (mu, pos_uncertainty, neg_uncertainty, symmetric_uncertainty)
+    return (mu, pos_uncertainty, neg_uncertainty, sys_error)
 
 
 

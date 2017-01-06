@@ -33,8 +33,9 @@ model_paths = "homogenisation-uves-wg{wg}-{parameter}.model"
 
 wgs = (1, )
 parameter_scales = OrderedDict([
-    ("feh", 0.10),
+    
     ("teff", 250.0),
+    ("feh", 0.10),
 
 ])
 
@@ -57,13 +58,13 @@ for wg in wgs:
             
         else:
             model = EnsembleModel(database, wg, parameter, benchmarks,
-                model_path="code/model/ensemble-model-4node.stan")# if parameter == "teff" else "code/model/ensemble-model-3node.stan")
+                model_path="code/model/ensemble-model-5node.stan" if parameter == "teff" else "code/model/ensemble-model-4node.stan")
             data, metadata = model._prepare_data(
                 default_sigma_calibrator=scale, 
                 sql_constraint="n.name like 'UVES-%'")
             assert all([n.startswith("UVES-") for n in metadata["node_names"]])
             if parameter == "teff":
-                assert data["N"] == 4
+                assert data["N"] == 5
             else:
                 assert data["N"] == 4
 
