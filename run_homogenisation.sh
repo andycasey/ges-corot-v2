@@ -1,3 +1,7 @@
+mkdir figures/
+mkdir figures/qc
+mkdir figures/qc/wg1
+psql -c 'create database ges_corot'
 python scripts/setup_db.py
 python scripts/plot_quality_control.py
 python scripts/propagate_flags.py
