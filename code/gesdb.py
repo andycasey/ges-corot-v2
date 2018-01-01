@@ -13,7 +13,7 @@ logger = logging.getLogger("ges")
 
 
 _adapt_str_to_float = lambda a: np.array(
-    [str(item).replace("NULL", "NaN").replace("--", "NaN") for item in a], 
+    [str(item).replace("NULL", "NaN").replace("--", "NaN") for item in a],
     dtype=float)
 
 
@@ -23,7 +23,7 @@ _FITS_FORMAT_ADAPTERS = {
     "e_vel": float,
     "vrot": float,
     "e_vrot": float,
-    "teff": float, 
+    "teff": float,
     "e_teff": float,
     "nn_teff": int,
     "enn_teff": float,
@@ -73,9 +73,9 @@ _FITS_FORMAT_ADAPTERS = {
     "e_veil": float,
     "ew_li":  float,
     "lim_ew_li": int,
-    "e_ew_li": float, 
-    "ewc_li": float, 
-    "lim_ewc_li": int, 
+    "e_ew_li": float,
+    "ewc_li": float,
+    "lim_ewc_li": int,
     "e_ewc_li": float,
     "ew_ha_acc": float,
     "e_ew_ha_acc": float,
@@ -260,13 +260,13 @@ class GESDatabase(Database):
         default_row = {"node_id": -1}
         columns = (
             "node_id", "cname", "filename", "setup", "snr",
-            "vel", "e_vel", "vrot", "e_vrot",     
+            "vel", "e_vel", "vrot", "e_vrot",
             "teff", "e_teff", "nn_teff", "enn_teff", "nne_teff", "sys_err_teff",
             "logg", "e_logg", "nn_logg", "enn_logg", "nne_logg", "sys_err_logg", "lim_logg",
             "feh", "e_feh", "nn_feh", "enn_feh", "nne_feh", "sys_err_feh",
             "xi", "e_xi", "nn_xi", "enn_xi", "nne_xi",
             "mh", "e_mh", "nn_mh", "enn_mh", "nne_mh",
-            "alpha_fe", "e_alpha_fe", "nn_alpha_fe", "enn_alpha_fe", "nne_alpha_fe", 
+            "alpha_fe", "e_alpha_fe", "nn_alpha_fe", "enn_alpha_fe", "nne_alpha_fe",
             "vrad", "e_vrad", "vsini", "e_vsini",
             "peculi", "remark", "tech")
 
@@ -286,7 +286,7 @@ class GESDatabase(Database):
                     del data[key.upper()]
                     data[tmp_key_format.format(key.upper())] = np.nan * np.ones(len(data))
                     data.rename_column(tmp_key_format.format(key.upper()), key.upper())
-                    
+
                 elif key in ("tech", "peculi", "remark"):
                     del data[key.upper()]
                     data[tmp_key_format.format(key.upper())] = [""] * len(data)
@@ -317,7 +317,10 @@ class GESDatabase(Database):
             else:
                 raise WTFError
 
-            if node_name == "Carmela-Elena":
+            if node_name.lower() == "carmela-elena":
+                for key in ("tech", "peculi", "remark"):
+                    row_data[key] = str(row_data[key])
+
                 use_columns = [] + list(columns)
                 for k in row_data.keys():
                     if isinstance(row_data[k], (bool, np.bool_)):
@@ -340,7 +343,7 @@ class GESDatabase(Database):
         self.connection.commit()
         return N
 
-        
+
     def ingest_spectra_masterlist(self, filename, extension=-1):
         """
         Ingest a master list of spectra from a FITS template file.
@@ -357,7 +360,7 @@ class GESDatabase(Database):
 
         # Create mapper between FITS and database columns.
         columns = ("cname", "ges_fld", "object", "filename", "ges_type", "setup",
-            "wg", "ra", "dec", "snr", "vel", "e_vel", "vrot", 
+            "wg", "ra", "dec", "snr", "vel", "e_vel", "vrot",
             "e_vrot", "teff_irfm", "e_teff_irfm", "peculi", "remark", "tech")
         fits_column_adapters = {
         }
@@ -373,7 +376,7 @@ class GESDatabase(Database):
             "teff_irfm": float,
             "e_teff_irfm": float,
         }
-        
+
         N = len(data)
         for i, row in enumerate(data):
             logger.info("Inserting row {}/{}".format(i, N))
@@ -415,16 +418,16 @@ class GESDatabase(Database):
         data = image[extension].data
 
         # The columns might be different, but in general if we lowerize them all
-        # then we are looking for: 
+        # then we are looking for:
         # ('CNAME_2', 'GES_FLD', 'teffjk', 'jk', 'FILENAME')
         cname_col, teff_col = (data.dtype.names[0], "teffjk")
 
-        # Update the value in the spectra table, unless it already exists.    
+        # Update the value in the spectra table, unless it already exists.
         N = 0
         for row in data:
             result = self.execute(
                 """ UPDATE spectra
-                    SET teff_irfm = %s 
+                    SET teff_irfm = %s
                     WHERE   cname = %s AND
                             teff_irfm = 'NaN'""",
                         (float(row[teff_col]), row[cname_col], ))
@@ -451,13 +454,13 @@ class GESDatabase(Database):
         default_row = { "wg": wg }
         columns = ("wg", # For default row
             "cname", "filename", "setup", "snr",
-            "vel", "e_vel", "vrot", "e_vrot",     
+            "vel", "e_vel", "vrot", "e_vrot",
             "teff", "e_teff", "nn_teff", "enn_teff", "nne_teff", "sys_err_teff",
             "logg", "e_logg", "nn_logg", "enn_logg", "nne_logg", "sys_err_logg", "lim_logg",
             "feh", "e_feh", "nn_feh", "enn_feh", "nne_feh", "sys_err_feh",
             "xi", "e_xi", "nn_xi", "enn_xi", "nne_xi",
             "mh", "e_mh", "nn_mh", "enn_mh", "nne_mh",
-            "alpha_fe", "e_alpha_fe", "nn_alpha_fe", "enn_alpha_fe", "nne_alpha_fe", 
+            "alpha_fe", "e_alpha_fe", "nn_alpha_fe", "enn_alpha_fe", "nne_alpha_fe",
             "vrad", "e_vrad", "vsini", "e_vsini",
             "peculi", "remark", "tech",
 
@@ -533,7 +536,7 @@ class GESDatabase(Database):
 
         self.connection.commit()
 
-        return 
+        return
 
 
 class UnknownNodeError(BaseException):
