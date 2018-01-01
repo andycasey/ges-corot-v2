@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from collections import OrderedDict
 from matplotlib.ticker import MaxNLocator
 
-import brewer2mpl # For pretty colors.
+#import brewer2mpl # For pretty colors.
 
 logger = logging.getLogger("ges")
 
@@ -37,7 +37,8 @@ def systematic_uncertainty(model, ax=None, N_bins=50, xlabel=None, legend=True,
 
     N = model._chains["vs_c"].shape[1]
 
-    colors = brewer2mpl.get_map("Set1", "qualitative", N).mpl_colors
+    #colors = brewer2mpl.get_map("Set1", "qualitative", N).mpl_colors
+    colors = mpl.cm.get_cmap('Set1', N)
 
     max_abs_sigma = np.sqrt(np.max(np.abs(model._chains["vs_c"])))
     bins = np.linspace(0, max_abs_sigma, N_bins)
@@ -46,7 +47,7 @@ def systematic_uncertainty(model, ax=None, N_bins=50, xlabel=None, legend=True,
     for i, (node_id, node_name) in enumerate(zip(*nodes)):
 
         ax.hist(np.sqrt(model._chains["vs_c"][:, i]),
-            facecolor=colors[i], edgecolor=colors[i], bins=bins, 
+            facecolor=colors[i], edgecolor=colors[i], bins=bins,
             alpha=0.5, lw=2, normed=True, histtype="stepfilled",
             label=r"${{\rm {0}}}$".format(node_name.strip()))
 
@@ -72,7 +73,7 @@ def systematic_uncertainty(model, ax=None, N_bins=50, xlabel=None, legend=True,
         ax.legend(**kwds)
 
     ax.set(
-        adjustable="box-forced", 
+        adjustable="box-forced",
         aspect=np.ptp(ax.get_xlim())/np.ptp(ax.get_ylim()))
 
     fig.tight_layout()
@@ -109,7 +110,8 @@ def node_relative_systematic_uncertainty(model, axes=None, quartiles=[16, 50, 84
 
     # TODO: Common colors.
     N = len(nodes[0])
-    colors = brewer2mpl.get_map("Set1", "qualitative", N + 1).mpl_colors
+    #colors = brewer2mpl.get_map("Set1", "qualitative", N + 1).mpl_colors
+    colors = mpl.cm.get_cmap('Set1', N + 1)
 
     parameter_bounds = OrderedDict([
         ("teff", (3000, 8000)),
@@ -151,10 +153,10 @@ def node_relative_systematic_uncertainty(model, axes=None, quartiles=[16, 50, 84
 
             ax.plot(x, q[Q / 2], lw=2, c=colors[j], zorder=10,
                 label=r"${{\rm {0}}}$".format(node_name.strip()))
-    
+
             # Show filled region.
             if Q > 1:
-                ax.fill_between(x.flatten(), q[0], q[-1], facecolor=colors[j], 
+                ax.fill_between(x.flatten(), q[0], q[-1], facecolor=colors[j],
                     alpha=0.5, edgecolor="none")
 
 
@@ -183,7 +185,7 @@ def node_relative_systematic_uncertainty(model, axes=None, quartiles=[16, 50, 84
 
         # Force the axes to be square when saving it.
         ax.set(
-            adjustable="box-forced", 
+            adjustable="box-forced",
             aspect=np.ptp(ax.get_xlim())/np.ptp(ax.get_ylim()))
 
     fig.tight_layout()
@@ -199,7 +201,7 @@ def node_relative_systematic_uncertainty(model, axes=None, quartiles=[16, 50, 84
     return fig
 
 
-def node_uncertainty_with_snr(model, quartiles=[16, 50, 84], show_cr_bound=True, 
+def node_uncertainty_with_snr(model, quartiles=[16, 50, 84], show_cr_bound=True,
     xlims=(1, 100), ylims=None, Ns=100, **kwargs):
     """
     Plot the total node uncertainty as a function of S/N ratio.
@@ -227,7 +229,8 @@ def node_uncertainty_with_snr(model, quartiles=[16, 50, 84], show_cr_bound=True,
     nodes = (model._metadata["node_ids"], model._metadata["node_names"])
     N = len(nodes[0])
 
-    colors = brewer2mpl.get_map("Set1", "qualitative", N + 1).mpl_colors
+    #colors = brewer2mpl.get_map("Set1", "qualitative", N + 1).mpl_colors
+    colors = mpl.cm.get_cmap('Set1', N + 1)
 
     fig, ax = plt.subplots()
 
@@ -246,19 +249,19 @@ def node_uncertainty_with_snr(model, quartiles=[16, 50, 84], show_cr_bound=True,
 
         # Show filled region.
         if Q > 1:
-            ax.fill_between(x.flatten(), q[0], q[-1], facecolor=colors[i], 
+            ax.fill_between(x.flatten(), q[0], q[-1], facecolor=colors[i],
                 alpha=0.5, edgecolor="none")
 
 
     if show_cr_bound:
         # Calculate the minimum variance as a function of SNR using all the
         # information from every node.
-        
+
         C = model._chains["alpha_sq"].shape[0]
         sigma_wg = np.zeros((C, x.size))
 
         y = np.zeros((Ns, x.size))
-            
+
         indices = np.random.choice(range(C), size=Ns, replace=False)
         for i, j in enumerate(indices):
 
@@ -272,7 +275,7 @@ def node_uncertainty_with_snr(model, quartiles=[16, 50, 84], show_cr_bound=True,
                 np.dot(I, chains["L_corr"][i]).T)
 
             for k in range(x.size):
-                
+
                 Sigma = np.tile(diag[:, k], N).reshape(N, N) \
                       * np.repeat(diag[:, k], N).reshape(N, N) \
                       * rho
@@ -288,9 +291,9 @@ def node_uncertainty_with_snr(model, quartiles=[16, 50, 84], show_cr_bound=True,
                 r"${\rm Homogenised}$"
                 "\n"
                 r"$({\rm Cram\'er$-${\rm Rao}$ ${\rm bound)}$")
-    
+
         if Q > 1:
-            ax.fill_between(x.flatten(), g[0], g[-1], 
+            ax.fill_between(x.flatten(), g[0], g[-1],
                 facecolor=colors[-1], alpha=0.5, edgecolor="none", zorder=10)
 
     ax.set_xlim(*xlims)
@@ -309,13 +312,13 @@ def node_uncertainty_with_snr(model, quartiles=[16, 50, 84], show_cr_bound=True,
         ylims = default_ylims.get(model._parameter, None)
 
     ax.set_ylim(ylims)
-    
+
     legend_kwds = dict(fontsize=10, loc="upper center", ncol=2, frameon=False)
     legend_kwds.update(kwargs.get("legend_kwds", {}))
     plt.legend(**legend_kwds)
-    
+
     ax.set(
-        adjustable="box-forced", 
+        adjustable="box-forced",
         aspect=np.ptp(ax.get_xlim())/np.ptp(ax.get_ylim()))
 
     fig.tight_layout()
@@ -348,7 +351,7 @@ def node_correlations(model, reorder=True, plot_edges=True, animate=False,
         Plot edges surrounding the lower-diagonal matrix.
 
     :param animate: [optional]
-        If `True`, then return a generator that produces `frames` of the 
+        If `True`, then return a generator that produces `frames` of the
         correlation matrix.
     """
 
@@ -378,7 +381,7 @@ def _node_correlations_animated(model, reorder=True, plot_edges=True, frames=100
     # Compress down to percentiles.
     if not reverse:
         q = np.linspace(0, 100, frames)
-    
+
     else:
         q = np.hstack([
                 np.linspace(0, 100, frames/2),
@@ -429,14 +432,14 @@ def _node_correlations_animated(model, reorder=True, plot_edges=True, frames=100
     # the resulting figure is ready for publication.
 
     # Set NaN's for the upper triangle.
-    rho = rho[:, 1:, :-1] 
+    rho = rho[:, 1:, :-1]
     for f in range(F):
         for i in range(N - 1):
             for j in range(i + 1, N - 1):
-                rho[f, i, j] = np.nan        
+                rho[f, i, j] = np.nan
 
     im = ax.imshow(rho[0], vmin=vmin, vmax=vmax, cmap=cmap, interpolation="nearest")
-    
+
     ax.spines["right"].set_visible(False)
     ax.spines["top"].set_visible(False)
     ax.spines["left"].set_visible(False)
@@ -448,7 +451,7 @@ def _node_correlations_animated(model, reorder=True, plot_edges=True, frames=100
     ax.set_yticks(range(N - 1))
     ax.set_xticklabels(node_names[:-1], rotation=90)
     ax.set_yticklabels(node_names[1:])
-    
+
     # Draw a line around everything.
     if plot_edges:
         kwds = dict(lw=2, c="k")
@@ -491,9 +494,9 @@ def _node_correlations_animated(model, reorder=True, plot_edges=True, frames=100
     bottom, height = 0.05, 0.05
     co = kwargs.get("__cbar_offset", 0.01)
     cbar.ax.set_position([
-        ax.get_position().x0 + co, 
-        bottom, 
-        ax.get_position().width - co*2, 
+        ax.get_position().x0 + co,
+        bottom,
+        ax.get_position().width - co*2,
         bottom + height
     ])
     plt.show()
@@ -507,7 +510,7 @@ def _node_correlations_animated(model, reorder=True, plot_edges=True, frames=100
 
     fig.savefig = new_savefig
     """
-    
+
     for f in range(F):
         im.set_data(rho[f])
         #plt.show()
@@ -569,14 +572,14 @@ def _node_correlations(model, reorder=True, plot_edges=True, **kwargs):
     # the resulting figure is ready for publication.
 
     # Set NaN's for the upper triangle.
-    rho = rho[1:, :-1] 
+    rho = rho[1:, :-1]
     for i in range(N - 1):
         for j in range(i + 1, N - 1):
-            rho[i, j] = np.nan        
+            rho[i, j] = np.nan
 
 
     im = ax.imshow(rho, vmin=vmin, vmax=vmax, cmap=cmap, interpolation="nearest")
-    
+
     ax.spines["right"].set_visible(False)
     ax.spines["top"].set_visible(False)
     ax.spines["left"].set_visible(False)
@@ -588,7 +591,7 @@ def _node_correlations(model, reorder=True, plot_edges=True, **kwargs):
     ax.set_yticks(range(N - 1))
     ax.set_xticklabels(node_names[:-1], rotation=90)
     ax.set_yticklabels(node_names[1:])
-    
+
     # Draw a line around everything.
     if plot_edges:
         kwds = dict(lw=2, c="k")
@@ -631,9 +634,9 @@ def _node_correlations(model, reorder=True, plot_edges=True, **kwargs):
     bottom, height = 0.05, 0.05
     co = kwargs.get("__cbar_offset", 0.01)
     cbar.ax.set_position([
-        ax.get_position().x0 + co, 
-        bottom, 
-        ax.get_position().width - co*2, 
+        ax.get_position().x0 + co,
+        bottom,
+        ax.get_position().width - co*2,
         bottom + height
     ])
     plt.show()
@@ -662,7 +665,8 @@ def biases(model, ax=None, N_bins=50, xlabel=None, legend=True, **kwargs):
 
     N = model._chains["biases"].shape[1]
 
-    colors = brewer2mpl.get_map("Set1", "qualitative", N).mpl_colors
+    #colors = brewer2mpl.get_map("Set1", "qualitative", N).mpl_colors
+    colors = mpl.cm.get_cmap('Set1', N)
 
     max_abs_bias = np.max(np.abs(model._chains["biases"]))
     bins = np.linspace(-max_abs_bias, +max_abs_bias, N_bins)
@@ -670,8 +674,8 @@ def biases(model, ax=None, N_bins=50, xlabel=None, legend=True, **kwargs):
     nodes = (model._metadata["node_ids"], model._metadata["node_names"])
     for i, (node_id, node_name) in enumerate(zip(*nodes)):
 
-        ax.hist(model._chains["biases"][:, i], 
-            facecolor=colors[i], edgecolor=colors[i], bins=bins, 
+        ax.hist(model._chains["biases"][:, i],
+            facecolor=colors[i], edgecolor=colors[i], bins=bins,
             alpha=0.5, lw=2, normed=True, histtype="stepfilled",
             label=r"${{\rm {0}}}$".format(format_node_name(node_name)))
 
@@ -715,7 +719,7 @@ def minimum_node_uncertainty(model, node_name, vmin=None, vmax=None, **kwargs):
     """
     Show the minimum 1\sigma uncertainty from a node as a function of stellar
     parameter space.
-    
+
     :param model:
         A trained ensemble model.
 
@@ -747,7 +751,7 @@ def minimum_node_uncertainty(model, node_name, vmin=None, vmax=None, **kwargs):
     logg_scale = np.max(model._data["all_mu_calibrator"][:, 1]) - logg_offset
     feh_offset = np.min(model._data["all_mu_calibrator"][:, 2])
     feh_scale = np.max(model._data["all_mu_calibrator"][:, 2]) - feh_offset
-    
+
     sigmas = []
     points = []
     for t, teff in enumerate(np.linspace(*extents["teff"])):
@@ -758,11 +762,11 @@ def minimum_node_uncertainty(model, node_name, vmin=None, vmax=None, **kwargs):
                 teff_norm = np.clip(1.0 - (teff - teff_offset)/teff_scale, 0, 1)
                 logg_norm = np.clip(1.0 - (logg - logg_offset)/logg_scale, 0, 1)
                 feh_norm = np.clip(1.0 - (feh - feh_offset)/feh_scale, 0, 1)
-                
+
                 AMCS = np.array([
                     teff_norm**2, logg_norm**2, feh_norm**2,
                     teff_norm, logg_norm, feh_norm,
-                    teff_norm * logg_norm, 
+                    teff_norm * logg_norm,
                     teff_norm * feh_norm,
                     logg_norm * feh_norm
                 ]).reshape(-1, 1)
@@ -784,7 +788,7 @@ def minimum_node_uncertainty(model, node_name, vmin=None, vmax=None, **kwargs):
                 relative_sigma = np.sum(theta * AMCS, axis=0)
 
                 sigma = slicer(constant * (4.0 + relative_sigma))
-                
+
                 points.append([teff, feh, logg])
                 sigmas.append(sigma)
 
@@ -810,7 +814,7 @@ def minimum_node_uncertainty(model, node_name, vmin=None, vmax=None, **kwargs):
     tr = (lbdim + plotdim) / dim
     fig.subplots_adjust(left=lb, bottom=lb, right=tr, top=tr,
         wspace=whspace, hspace=whspace)
-    
+
     data = {}
     for i in range(1, K):
         for j in range(K):
@@ -827,7 +831,7 @@ def minimum_node_uncertainty(model, node_name, vmin=None, vmax=None, **kwargs):
 
             # Get the projection index.
             k = list(set(range(3)).difference([i, j]))[0]
-            
+
             # Get unique points along projection.
             indices = np.sort(list(set(range(3)).difference([k])))
             projected_points = np.vstack({tuple(row) for row in points[:, indices]})
@@ -843,7 +847,7 @@ def minimum_node_uncertainty(model, node_name, vmin=None, vmax=None, **kwargs):
 
     values = np.vstack([v[-1] for v in data.values()])
     vmin, vmax = (vmin or values.min(), vmax or values.max())
-    
+
     for i in range(1, K):
         for j in range(K):
             if j >= i:
@@ -890,5 +894,5 @@ def minimum_node_uncertainty(model, node_name, vmin=None, vmax=None, **kwargs):
     axes[0, 1].set_visible(True)
     fig.tight_layout()
     axes[0, 1].set_visible(False)
-    
+
     return fig
